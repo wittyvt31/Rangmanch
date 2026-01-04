@@ -119,7 +119,6 @@ export function UploadForm() {
     setCredits((prev) => (prev !== null ? prev - 1 : 0));
 
     try {
-    try {
       // Create film record first (idempotent)
       const result = await createFilm({
         title: data.title,
