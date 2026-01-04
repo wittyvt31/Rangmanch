@@ -51,3 +51,4 @@ export function FilmCard({ film, directorName }: FilmCardProps) {
   );
 }
 
+

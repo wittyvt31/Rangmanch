@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { test } = body;
+    const { test, filmId } = body;
 
     // Create a direct upload URL from Mux
     const upload = await Video.Uploads.create({
@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       },
       cors_origin: "*",
       test: test || false,
+      passthrough: filmId || undefined,
     });
 
     return NextResponse.json({

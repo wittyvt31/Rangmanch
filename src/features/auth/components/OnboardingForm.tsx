@@ -32,8 +32,8 @@ const onboardingSchema = z.object({
     .min(3, "Username must be at least 3 characters")
     .max(30, "Username must be less than 30 characters")
     .regex(
-      /^[a-zA-Z0-9_]+$/,
-      "Username can only contain letters, numbers, and underscores"
+      /^[a-z0-9_]+$/,
+      "Username must be lowercase alphanumeric only."
     ),
   full_name: z.string().min(1, "Full name is required").max(100),
   phone: z.string().optional(),
@@ -77,7 +77,7 @@ export function OnboardingForm() {
     }
 
     // Validate format first
-    if (!/^[a-zA-Z0-9_]+$/.test(watchedUsername)) {
+    if (!/^[a-z0-9_]+$/.test(watchedUsername)) {
       setUsernameStatus({ checking: false, available: null });
       return;
     }
@@ -104,7 +104,12 @@ export function OnboardingForm() {
 
     setIsSubmitting(true);
     try {
-      const result = await completeOnboarding(data);
+      // Sanitize username to lowercase before sending
+      const sanitizedData = {
+        ...data,
+        username: data.username.toLowerCase(),
+      };
+      const result = await completeOnboarding(sanitizedData);
       if (result.success) {
         toast.success("Profile completed successfully!");
         router.push("/studio");
@@ -142,7 +147,8 @@ export function OnboardingForm() {
                 disabled={isSubmitting}
                 className="w-full"
                 onChange={(e) => {
-                  setValue("username", e.target.value);
+                  const lowercasedValue = e.target.value.toLowerCase();
+                  setValue("username", lowercasedValue);
                   trigger("username");
                 }}
               />

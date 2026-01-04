@@ -25,6 +25,7 @@ export async function createFilm(
     }
 
     // Create film record with 'processing' status (idempotent)
+    // submission_fee_paid is set to true because credit is consumed before calling this
     const { data, error } = await supabase
       .from("films")
       .insert({
@@ -35,7 +36,7 @@ export async function createFilm(
         poster_url: formData.poster_url || null,
         mux_asset_id: formData.mux_asset_id || null,
         status: "processing",
-        submission_fee_paid: false,
+        submission_fee_paid: true,
         views: 0,
       })
       .select("id")
@@ -48,6 +49,108 @@ export async function createFilm(
 
     revalidatePath("/studio");
     return { success: true, data: { id: data.id } };
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
+export async function getUnfinishedDraft(): Promise<
+  ActionResult<{
+    id: string;
+    title: string;
+    description: string | null;
+    poster_url: string | null;
+    duration: number | null;
+  } | null>
+> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Find the latest unfinished draft
+    const { data, error } = await supabase
+      .from("films")
+      .select("id, title, description, poster_url, duration")
+      .eq("uploader_id", user.id)
+      .eq("status", "processing")
+      .eq("submission_fee_paid", true)
+      .is("mux_asset_id", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error fetching unfinished draft:", error);
+      return { success: false, error: "Failed to fetch draft" };
+    }
+
+    return { success: true, data: data || null };
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
+
+export async function updateFilm(
+  filmId: string,
+  formData: { title: string; description?: string; duration?: number | null; poster_url?: string | null }
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Verify ownership
+    const { data: film, error: fetchError } = await supabase
+      .from("films")
+      .select("uploader_id")
+      .eq("id", filmId)
+      .single();
+
+    if (fetchError || !film) {
+      return { success: false, error: "Film not found" };
+    }
+
+    if (film.uploader_id !== user.id) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Update film data
+    const { error: updateError } = await supabase
+      .from("films")
+      .update({
+        title: formData.title,
+        description: formData.description || null,
+        duration: formData.duration || null,
+        poster_url: formData.poster_url || null,
+      })
+      .eq("id", filmId);
+
+    if (updateError) {
+      console.error("Error updating film:", updateError);
+      return { success: false, error: "Failed to update film" };
+    }
+
+    revalidatePath("/studio");
+    return { success: true, data: undefined };
   } catch (error) {
     console.error("Unexpected error:", error);
     return {

@@ -12,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUpload } from "@/features/studio/components/ImageUpload";
-import { createFilm, updateFilmMuxData, addCredit } from "@/features/studio/actions";
+import { createFilm, updateFilm, updateFilmMuxData, addCredit, getUnfinishedDraft } from "@/features/studio/actions";
 import { getCredits, consumeCredit } from "@/features/payments/actions";
 import { PaymentModal } from "@/features/payments/components/PaymentModal";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -51,6 +52,15 @@ export function UploadForm() {
   const [credits, setCredits] = useState<number | null>(null);
   const [isCheckingCredits, setIsCheckingCredits] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [foundDraft, setFoundDraft] = useState<{
+    id: string;
+    title: string;
+    description: string | null;
+    poster_url: string | null;
+    duration: number | null;
+  } | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [isResuming, setIsResuming] = useState(false);
   const router = useRouter();
 
   const {
@@ -74,10 +84,19 @@ export function UploadForm() {
 
   const posterUrl = watch("poster_url");
 
-  // Check credits on mount
+  // Check credits and unfinished drafts on mount
   useEffect(() => {
-    const checkCredits = async () => {
+    const checkCreditsAndDrafts = async () => {
       setIsCheckingCredits(true);
+      
+      // Check for unfinished drafts first
+      const draftResult = await getUnfinishedDraft();
+      if (draftResult.success && draftResult.data) {
+        setFoundDraft(draftResult.data);
+        setShowResumeDialog(true);
+      }
+      
+      // Check credits
       const result = await getCredits();
       if (result.success) {
         setCredits(result.data);
@@ -89,7 +108,7 @@ export function UploadForm() {
       }
       setIsCheckingCredits(false);
     };
-    checkCredits();
+    checkCreditsAndDrafts();
   }, []);
 
   const handlePaymentSuccess = async () => {
@@ -100,9 +119,93 @@ export function UploadForm() {
     }
   };
 
+  // Handle resume draft
+  const handleResumeDraft = async () => {
+    if (!foundDraft) return;
+
+    setShowResumeDialog(false);
+    setIsResuming(true);
+    setFilmId(foundDraft.id);
+
+    // Populate form with draft data
+    setValue("title", foundDraft.title);
+    setValue("description", foundDraft.description || "");
+    setValue("duration", foundDraft.duration || undefined);
+    if (foundDraft.poster_url) {
+      setValue("poster_url", foundDraft.poster_url);
+    }
+
+    // Get Mux upload URL and go directly to step 3
+    try {
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ test: false, filmId: foundDraft.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get upload URL");
+      }
+
+      const { uploadId: id, url } = await response.json();
+      setUploadId(id);
+      setUploadUrl(url);
+      setCurrentStep(3); // Skip to video upload step
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to initialize upload");
+      setIsResuming(false);
+    }
+  };
+
+  // Handle start new upload
+  const handleStartNew = () => {
+    setShowResumeDialog(false);
+    setFoundDraft(null);
+    setIsResuming(false);
+  };
+
   // Step 1: Get Mux upload URL and create film record
   const handleStep1Submit = async (data: FilmFormData) => {
-    // Check and consume credit before proceeding
+    // If resuming, skip credit consumption and update existing film
+    if (isResuming && filmId) {
+      try {
+        // Update existing film with new data
+        const updateResult = await updateFilm(filmId, {
+          title: data.title,
+          description: data.description || "",
+          duration: data.duration || null,
+          poster_url: posterUrl || null,
+        });
+
+        if (!updateResult.success) {
+          toast.error(updateResult.error);
+          return;
+        }
+
+        // Get Mux upload URL
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ test: false, filmId: filmId }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to get upload URL");
+        }
+
+        const { uploadId: id, url } = await response.json();
+        setUploadId(id);
+        setUploadUrl(url);
+        setCurrentStep(2);
+      } catch (error) {
+        console.error("Error:", error);
+        toast.error("Failed to initialize upload");
+      }
+      return;
+    }
+
+    // New upload flow - check and consume credit
     if (credits === null || credits <= 0) {
       setIsPaymentModalOpen(true);
       return;
@@ -139,7 +242,7 @@ export function UploadForm() {
       const response = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ test: false }),
+        body: JSON.stringify({ test: false, filmId: result.data.id }),
       });
 
       if (!response.ok) {
@@ -575,6 +678,35 @@ export function UploadForm() {
         onOpenChange={setIsPaymentModalOpen}
         onSuccess={handlePaymentSuccess}
       />
+      
+      {/* Resume Draft Dialog */}
+      <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Unfinished Upload Found</DialogTitle>
+            <DialogDescription>
+              You have an unfinished film &quot;{foundDraft?.title}&quot;. Would you like to resume it?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleStartNew}
+              className="w-full sm:w-auto"
+            >
+              Start New (Consumes Credit)
+            </Button>
+            <Button
+              type="button"
+              onClick={handleResumeDraft}
+              className="w-full sm:w-auto"
+            >
+              Resume (Free)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
