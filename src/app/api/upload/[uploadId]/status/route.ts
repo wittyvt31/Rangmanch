@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Mux from "@mux/mux-node";
 
-const { Video } = new Mux(
-  process.env.MUX_TOKEN_ID!,
-  process.env.MUX_TOKEN_SECRET!
-);
+// Validate environment variables
+const muxTokenId = process.env.MUX_TOKEN_ID;
+const muxTokenSecret = process.env.MUX_TOKEN_SECRET;
+
+if (!muxTokenId || !muxTokenSecret) {
+  throw new Error(
+    "MUX_TOKEN_ID and MUX_TOKEN_SECRET must be set in environment variables"
+  );
+}
+
+const mux = new Mux({
+  tokenId: muxTokenId,
+  tokenSecret: muxTokenSecret,
+});
 
 export async function GET(
   request: NextRequest,
@@ -25,7 +35,7 @@ export async function GET(
     const { uploadId } = await params;
 
     // Get upload status from Mux
-    const upload = await Video.Uploads.get(uploadId);
+    const upload = await mux.video.uploads.retrieve(uploadId);
 
     if (!upload.asset_id) {
       return NextResponse.json({
@@ -36,7 +46,7 @@ export async function GET(
     }
 
     // Get asset details
-    const asset = await Video.Assets.get(upload.asset_id);
+    const asset = await mux.video.assets.retrieve(upload.asset_id);
 
     return NextResponse.json({
       status: asset.status,

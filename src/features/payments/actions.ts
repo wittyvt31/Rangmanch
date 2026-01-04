@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 import Razorpay from "razorpay";
 import crypto from "crypto";
@@ -15,9 +16,12 @@ if (!razorpayKeySecret) {
   throw new Error("RAZORPAY_KEY_SECRET is not set");
 }
 
+// TypeScript assertion: we've checked above that it's defined
+const RAZORPAY_KEY_SECRET: string = razorpayKeySecret;
+
 const razorpay = new Razorpay({
   key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-  key_secret: razorpayKeySecret,
+  key_secret: RAZORPAY_KEY_SECRET,
 });
 
 export async function createOrder(): Promise<ActionResult<{ orderId: string }>> {
@@ -35,7 +39,7 @@ export async function createOrder(): Promise<ActionResult<{ orderId: string }>> 
     const options = {
       amount: 19900, // ₹199 in paise
       currency: "INR",
-      receipt: `credit_${user.id}_${Date.now()}`,
+      receipt: `rcpt_${user.id.slice(-12)}_${Date.now().toString().slice(-8)}`,
     };
 
     const order = await razorpay.orders.create(options);
@@ -56,6 +60,7 @@ export async function verifyPayment(
   razorpay_signature: string
 ): Promise<ActionResult<void>> {
   try {
+    // Step A: Use user client ONLY for authentication check
     const supabase = await createClient();
     const {
       data: { user },
@@ -68,7 +73,7 @@ export async function verifyPayment(
     // Verify signature using HMAC SHA256
     const text = `${razorpay_order_id}|${razorpay_payment_id}`;
     const generatedSignature = crypto
-      .createHmac("sha256", razorpayKeySecret)
+      .createHmac("sha256", RAZORPAY_KEY_SECRET)
       .update(text)
       .digest("hex");
 
@@ -76,12 +81,18 @@ export async function verifyPayment(
       return { success: false, error: "Invalid payment signature" };
     }
 
+    // Step B: Use admin client for ALL database operations
+    const supabaseAdmin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
     // Check if this order was already processed (idempotency)
-    // We check if a transaction with this razorpay_id (order_id) already exists
-    const { data: existingTransaction } = await supabase
+    // We check if a transaction with this razorpay_order_id already exists
+    const { data: existingTransaction } = await supabaseAdmin
       .from("transactions")
       .select("id")
-      .eq("razorpay_id", razorpay_order_id)
+      .eq("razorpay_order_id", razorpay_order_id)
       .eq("user_id", user.id)
       .single();
 
@@ -91,12 +102,13 @@ export async function verifyPayment(
     }
 
     // Store transaction record for idempotency (before crediting)
-    const { error: transactionError } = await supabase
+    const { error: transactionError } = await supabaseAdmin
       .from("transactions")
       .insert({
         user_id: user.id,
         amount: 199,
-        razorpay_id: razorpay_order_id,
+        razorpay_order_id: razorpay_order_id,
+        status: "success",
         type: "credit_purchase",
       });
 
@@ -106,19 +118,21 @@ export async function verifyPayment(
     }
 
     // Increment submission_credits by 1
-    const { data: profile, error: profileError } = await supabase
+    console.log("Searching for profile with ID:", user.id);
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
       .select("submission_credits")
       .eq("id", user.id)
       .single();
 
     if (profileError || !profile) {
-      return { success: false, error: "Profile not found" };
+      console.error("Profile error:", profileError);
+      return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
     const currentCredits = profile.submission_credits || 0;
 
-    const { error: creditError } = await supabase
+    const { error: creditError } = await supabaseAdmin
       .from("profiles")
       .update({
         submission_credits: currentCredits + 1,
@@ -153,6 +167,7 @@ export async function consumeCredit(): Promise<ActionResult<void>> {
     }
 
     // Check current credits
+    console.log("Searching for profile with ID:", user.id);
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("submission_credits")
@@ -160,7 +175,8 @@ export async function consumeCredit(): Promise<ActionResult<void>> {
       .single();
 
     if (profileError || !profile) {
-      return { success: false, error: "Profile not found" };
+      console.error("Profile error:", profileError);
+      return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
     const currentCredits = profile.submission_credits || 0;
@@ -204,6 +220,7 @@ export async function getCredits(): Promise<ActionResult<number>> {
       return { success: false, error: "Unauthorized" };
     }
 
+    console.log("Searching for profile with ID:", user.id);
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("submission_credits")
@@ -211,7 +228,8 @@ export async function getCredits(): Promise<ActionResult<number>> {
       .single();
 
     if (error || !profile) {
-      return { success: false, error: "Profile not found" };
+      console.error("Profile error:", error);
+      return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
     return { success: true, data: profile.submission_credits || 0 };

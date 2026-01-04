@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import Mux from "@mux/mux-node";
 import { createClient } from "@supabase/supabase-js";
 
+// Validate environment variables
+const muxTokenId = process.env.MUX_TOKEN_ID;
+const muxTokenSecret = process.env.MUX_TOKEN_SECRET;
+const webhookSecret = process.env.MUX_WEBHOOK_SECRET;
+
+if (!muxTokenId || !muxTokenSecret) {
+  throw new Error(
+    "MUX_TOKEN_ID and MUX_TOKEN_SECRET must be set in environment variables"
+  );
+}
+
+// Initialize Mux client (webhookSecret is optional and checked at runtime)
+const mux = new Mux({
+  tokenId: muxTokenId,
+  tokenSecret: muxTokenSecret,
+  webhookSecret: webhookSecret || undefined,
+});
+
 // Create Supabase client with service role key to bypass RLS
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +45,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify webhook signature
-    const webhookSecret = process.env.MUX_WEBHOOK_SECRET;
     if (!webhookSecret) {
       console.error("MUX_WEBHOOK_SECRET not configured");
       return NextResponse.json(
@@ -36,24 +53,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify webhook signature (may throw or return boolean)
-    let isValid = false;
+    // The verifySignature method throws an error if the signature is invalid
     try {
-      isValid = Mux.Webhooks.verifyHeader(
+      mux.webhooks.verifySignature(
         body,
-        signature,
+        { "mux-signature": signature },
         webhookSecret
       );
     } catch (verifyError) {
       console.error("Webhook signature verification error:", verifyError);
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
-    }
-
-    if (!isValid) {
-      console.error("Invalid webhook signature");
       return NextResponse.json(
         { error: "Invalid signature" },
         { status: 401 }

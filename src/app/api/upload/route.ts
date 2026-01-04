@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Mux from "@mux/mux-node";
 
-const { Video } = new Mux(
-  process.env.MUX_TOKEN_ID!,
-  process.env.MUX_TOKEN_SECRET!
-);
+// Validate environment variables
+const muxTokenId = process.env.MUX_TOKEN_ID;
+const muxTokenSecret = process.env.MUX_TOKEN_SECRET;
+
+if (!muxTokenId || !muxTokenSecret) {
+  throw new Error(
+    "MUX_TOKEN_ID and MUX_TOKEN_SECRET must be set in environment variables"
+  );
+}
+
+const mux = new Mux({
+  tokenId: muxTokenId,
+  tokenSecret: muxTokenSecret,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,13 +33,13 @@ export async function POST(request: NextRequest) {
     const { test, filmId } = body;
 
     // Create a direct upload URL from Mux
-    const upload = await Video.Uploads.create({
+    const upload = await mux.video.uploads.create({
       new_asset_settings: {
         playback_policy: ["public"],
+        passthrough: filmId || undefined,
       },
       cors_origin: "*",
       test: test || false,
-      passthrough: filmId || undefined,
     });
 
     return NextResponse.json({

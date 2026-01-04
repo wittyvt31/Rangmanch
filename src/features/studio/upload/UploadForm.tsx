@@ -5,7 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload as MuxUploader } from "@mux/mux-uploader-react";
+import MuxUploader from "@mux/mux-uploader-react";
 import { Loader2, Plus, X, ArrowRight, ArrowLeft, Coins } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +22,16 @@ import { useRouter } from "next/navigation";
 const filmSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   description: z.string().max(2000, "Description too long").optional(),
-  duration: z.coerce.number().positive("Duration must be positive").optional(),
+  duration: z
+    .union([z.number(), z.string(), z.undefined()])
+    .optional()
+    .transform((val) => {
+      if (val === undefined || val === "" || val === null) return undefined;
+      const num = typeof val === "string" ? Number(val) : val;
+      if (isNaN(num) || num <= 0) return undefined;
+      return num;
+    })
+    .pipe(z.number().positive("Duration must be positive").optional()),
   poster_url: z.string().url().optional().or(z.literal("")),
   credits: z
     .array(
@@ -34,7 +43,13 @@ const filmSchema = z.object({
     .optional(),
 });
 
-type FilmFormData = z.infer<typeof filmSchema>;
+type FilmFormData = {
+  title: string;
+  description?: string;
+  duration?: string | number;
+  poster_url?: string;
+  credits?: { role: string; email: string }[];
+};
 
 const steps = [
   { id: 1, name: "Basic Info" },
@@ -174,7 +189,7 @@ export function UploadForm() {
         const updateResult = await updateFilm(filmId, {
           title: data.title,
           description: data.description || "",
-          duration: data.duration || null,
+          duration: data.duration ? (typeof data.duration === "string" ? Number(data.duration) : data.duration) : null,
           poster_url: posterUrl || null,
         });
 
@@ -226,7 +241,7 @@ export function UploadForm() {
       const result = await createFilm({
         title: data.title,
         description: data.description || "",
-        duration: data.duration || null,
+        duration: data.duration ? (typeof data.duration === "string" ? Number(data.duration) : data.duration) : null,
         poster_url: posterUrl || null,
         mux_asset_id: null,
       });

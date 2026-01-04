@@ -27,7 +27,7 @@ export interface Credit {
 export interface FilmFormData {
   title: string;
   description: string;
-  duration: number;
+  duration?: number | null;
   poster_url: string | null;
   mux_asset_id: string | null;
 }

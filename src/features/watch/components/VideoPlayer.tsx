@@ -1,7 +1,6 @@
 "use client";
 
-import { MuxPlayer } from "@mux/mux-player-react";
-import "@mux/mux-player/themes/classic.css";
+import MuxPlayer from "@mux/mux-player-react";
 
 interface VideoPlayerProps {
   playbackId: string;

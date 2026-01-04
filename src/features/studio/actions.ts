@@ -283,7 +283,7 @@ export async function addCredit(
       try {
         const inviteUrl =
           process.env.NEXT_PUBLIC_APP_URL || "https://rangmanch.com";
-        const emailHtml = render(
+        const emailHtml = await render(
           InviteEmail({
             directorName,
             filmName: film.title,

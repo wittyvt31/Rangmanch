@@ -37,9 +37,10 @@ const onboardingSchema = z.object({
     ),
   full_name: z.string().min(1, "Full name is required").max(100),
   phone: z.string().optional(),
-  role: z.enum(["viewer", "filmmaker", "crew"], {
-    required_error: "Please select a role",
-  }),
+  role: z.enum(["viewer", "filmmaker", "crew"]).refine(
+    (val) => val !== undefined,
+    { message: "Please select a role" }
+  ),
 });
 
 type OnboardingFormData = z.infer<typeof onboardingSchema>;
@@ -112,8 +113,10 @@ export function OnboardingForm() {
       const result = await completeOnboarding(sanitizedData);
       if (result.success) {
         toast.success("Profile completed successfully!");
-        router.push("/studio");
         router.refresh();
+        setTimeout(() => {
+          router.push("/studio");
+        }, 500);
       } else {
         toast.error(result.error);
       }

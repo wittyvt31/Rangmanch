@@ -10,6 +10,7 @@ import {
   Settings,
   Menu,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,20 @@ export function StudioLayout({ children }: { children: React.ReactNode }) {
                     </Link>
                   );
                 })}
+                <div className="my-4 border-t border-border/50" />
+                <Link href="/">
+                  <motion.div
+                    whileHover={{ x: 4 }}
+                    transition={{ type: "spring", stiffness: 400 }}
+                    className={cn(
+                      "flex items-center gap-3 rounded-none px-4 py-3 text-sm font-medium transition-colors",
+                      "text-primary/70 hover:bg-background/50 hover:text-primary"
+                    )}
+                  >
+                    <ArrowLeft className="h-5 w-5" />
+                    Back to Republic
+                  </motion.div>
+                </Link>
               </nav>
             </div>
           </motion.aside>

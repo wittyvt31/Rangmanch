@@ -56,8 +56,12 @@ export default async function Home() {
   if (directorCredits) {
     directorCredits.forEach((credit) => {
       if (credit.profile_id && credit.profiles) {
-        const profile = credit.profiles as { email: string };
-        directorMap.set(credit.film_id, profile.email);
+        // profiles is an array from Supabase join, get the first element
+        const profilesArray = credit.profiles as Array<{ email: string }>;
+        const profile = Array.isArray(profilesArray) ? profilesArray[0] : profilesArray;
+        if (profile && profile.email) {
+          directorMap.set(credit.film_id, profile.email);
+        }
       } else if (credit.invited_email) {
         directorMap.set(credit.film_id, credit.invited_email);
       }
