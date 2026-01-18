@@ -37,9 +37,9 @@ export default async function DiscoverPage({
 
   // Apply duration filter
   if (filter === "shorts") {
-    query = query.lt("duration", 30);
+    query = query.lt("duration_mins", 30);
   } else if (filter === "features") {
-    query = query.gte("duration", 30);
+    query = query.gte("duration_mins", 30);
   }
 
   const { data: filmsData, error } = await query;

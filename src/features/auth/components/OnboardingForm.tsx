@@ -10,13 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Card,
   CardContent,
   CardDescription,
@@ -37,10 +30,6 @@ const onboardingSchema = z.object({
     ),
   full_name: z.string().min(1, "Full name is required").max(100),
   phone: z.string().optional(),
-  role: z.enum(["viewer", "filmmaker", "crew"]).refine(
-    (val) => val !== undefined,
-    { message: "Please select a role" }
-  ),
 });
 
 type OnboardingFormData = z.infer<typeof onboardingSchema>;
@@ -62,13 +51,9 @@ export function OnboardingForm() {
     trigger,
   } = useForm<OnboardingFormData>({
     resolver: zodResolver(onboardingSchema),
-    defaultValues: {
-      role: undefined,
-    },
   });
 
   const watchedUsername = watch("username");
-  const watchedRole = watch("role");
 
   // Debounced username availability check
   useEffect(() => {
@@ -216,31 +201,6 @@ export function OnboardingForm() {
             />
             {errors.phone && (
               <p className="text-sm text-destructive">{errors.phone.message}</p>
-            )}
-          </div>
-
-          {/* Role Field */}
-          <div className="space-y-2">
-            <Label htmlFor="role">Role *</Label>
-            <Select
-              value={watchedRole}
-              onValueChange={(value) => {
-                setValue("role", value as "viewer" | "filmmaker" | "crew");
-                trigger("role");
-              }}
-              disabled={isSubmitting}
-            >
-              <SelectTrigger id="role" className="w-full">
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="filmmaker">Filmmaker</SelectItem>
-                <SelectItem value="crew">Crew</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.role && (
-              <p className="text-sm text-destructive">{errors.role.message}</p>
             )}
           </div>
 

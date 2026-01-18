@@ -24,6 +24,17 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
   const [isLoading, setIsLoading] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
 
+  // Reset loading state when modal opens/closes
+  useEffect(() => {
+    if (open) {
+      setIsLoading(false);
+      // Check if Razorpay is already loaded
+      if (typeof window !== "undefined" && window.Razorpay) {
+        setIsScriptLoaded(true);
+      }
+    }
+  }, [open]);
+
   const handlePayment = async () => {
     if (!isScriptLoaded || !window.Razorpay) {
       toast.error("Payment system not ready. Please try again.");
@@ -50,7 +61,7 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
         amount: 19900, // ₹199 in paise
         currency: "INR",
         name: "RangManch",
-        description: "Pay ₹199 to Verify",
+        description: "Pay ₹199 for 1 Coin",
         order_id: orderId,
         handler: async (response: {
           razorpay_payment_id: string;
@@ -65,7 +76,7 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
           );
 
           if (verifyResult.success) {
-            toast.success("Payment successful! Credit added to your account.");
+            toast.success("Payment successful! Coin added to your account.");
             onOpenChange(false);
             onSuccess?.();
           } else {
@@ -82,6 +93,7 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
         modal: {
           ondismiss: () => {
             setIsLoading(false);
+            // Reset state when modal is dismissed
           },
         },
       };
@@ -90,6 +102,10 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
 
       razorpay.on("payment.failed", (response: { error: { description: string } }) => {
         toast.error(`Payment failed: ${response.error.description}`);
+        setIsLoading(false);
+      });
+
+      razorpay.on("payment.cancelled", () => {
         setIsLoading(false);
       });
 
@@ -114,16 +130,16 @@ export function PaymentModal({ open, onOpenChange, onSuccess }: PaymentModalProp
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="rounded-none">
           <DialogHeader>
-            <DialogTitle className="font-serif">Pay ₹199 to Verify</DialogTitle>
+            <DialogTitle className="font-serif">Pay ₹199 for 1 Coin</DialogTitle>
             <DialogDescription>
-              Purchase a credit to upload your film. Each credit allows you to
+              Purchase a coin to upload your film. Each coin allows you to
               submit one film for verification.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="rounded-none border border-border bg-surface p-4">
               <div className="flex items-center justify-between">
-                <span className="text-primary">Credit Purchase</span>
+                <span className="text-primary">Coin Purchase</span>
                 <span className="font-semibold text-primary">₹199</span>
               </div>
             </div>

@@ -23,7 +23,7 @@ const emailSchema = z.object({
 
 type EmailFormData = z.infer<typeof emailSchema>;
 
-export function LoginForm() {
+export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const supabase = createClient();
 
@@ -50,7 +50,7 @@ export function LoginForm() {
         return;
       }
 
-      toast.success("Check your email for the magic link!");
+      toast.success("We sent you a login link. Check your email.");
     } catch (error) {
       toast.error("Something went wrong. Please try again.");
     } finally {
@@ -81,9 +81,9 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader className="text-center">
-        <CardTitle className="font-serif text-3xl">RangManch</CardTitle>
+        <CardTitle className="font-serif text-3xl">Enter the Republic</CardTitle>
         <CardDescription>
-          Sign in to access The Republic of Cinema
+          Cinema awaits. Continue to join or sign in.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -113,7 +113,7 @@ export function LoginForm() {
             ) : (
               <>
                 <Mail className="mr-2 h-4 w-4" />
-                Send Magic Link
+                Continue with Email
               </>
             )}
           </Button>
@@ -151,5 +151,8 @@ export function LoginForm() {
     </Card>
   );
 }
+
+
+
 
 

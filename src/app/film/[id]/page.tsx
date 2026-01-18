@@ -143,10 +143,10 @@ export default async function FilmPage({ params }: FilmPageProps) {
 
           {/* Metadata */}
           <div className="mt-6 flex flex-wrap gap-6 text-sm text-primary/70">
-            {film.duration && (
+            {film.duration_mins && (
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                <span>{formatDuration(film.duration)}</span>
+                <span>{formatDuration(film.duration_mins)}</span>
               </div>
             )}
             <div className="flex items-center gap-2">

@@ -12,7 +12,6 @@ export interface OnboardingFormData {
   username: string;
   full_name: string;
   phone?: string;
-  role: "viewer" | "filmmaker" | "crew";
 }
 
 export async function completeOnboarding(
@@ -46,14 +45,15 @@ export async function completeOnboarding(
         username: formData.username,
         full_name: formData.full_name,
         phone: formData.phone || null,
-        role: formData.role,
+        role: "filmmaker",
       })
       .eq("id", user.id);
 
     if (updateError) {
       // Handle unique constraint violation
+      // Database constraint is the final referee for race conditions
       if (updateError.code === "23505") {
-        return { success: false, error: "Username is already taken" };
+        return { success: false, error: "Username is already claimed." };
       }
       console.error("Error updating profile:", updateError);
       return { success: false, error: "Failed to update profile" };
@@ -111,4 +111,54 @@ export async function checkUsernameAvailability(
   }
 }
 
+export async function signOut() {
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/");
+}
+
+export interface UpdateProfileFormData {
+  full_name: string;
+  bio?: string;
+}
+
+export async function updateProfile(
+  formData: UpdateProfileFormData
+): Promise<ActionResult<void>> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: "Unauthorized" };
+    }
+
+    // Update profile
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        full_name: formData.full_name,
+        bio: formData.bio || null,
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      console.error("Error updating profile:", updateError);
+      return { success: false, error: "Failed to update profile" };
+    }
+
+    revalidatePath("/studio/settings");
+    revalidatePath("/");
+
+    return { success: true, data: undefined };
+  } catch (error) {
+    console.error("Unexpected error:", error);
+    return {
+      success: false,
+      error: "An unexpected error occurred",
+    };
+  }
+}
 

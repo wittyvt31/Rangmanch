@@ -14,7 +14,7 @@ export interface Database {
           reputation_score: number;
           role: string;
           created_at: string;
-          submission_credits: number;
+          coins: number;
           bio: string | null;
         };
         Insert: {
@@ -27,7 +27,7 @@ export interface Database {
           reputation_score?: number;
           role?: string;
           created_at?: string;
-          submission_credits?: number;
+          coins?: number;
           bio?: string | null;
         };
         Update: Partial<Database['public']['Tables']['profiles']['Insert']>;
@@ -47,7 +47,8 @@ export interface Database {
           submission_fee_paid: boolean;
           launch_date: string;
           created_at: string;
-          views?: number; // Virtual column
+          views: number;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -64,6 +65,7 @@ export interface Database {
           launch_date?: string;
           created_at?: string;
           views?: number;
+          updated_at?: string;
         };
         Update: Partial<Database['public']['Tables']['films']['Insert']>;
       };

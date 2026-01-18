@@ -25,14 +25,14 @@ export async function createFilm(
     }
 
     // Create film record with 'processing' status (idempotent)
-    // submission_fee_paid is set to true because credit is consumed before calling this
+    // submission_fee_paid is set to true because coin is consumed before calling this
     const { data, error } = await supabase
       .from("films")
       .insert({
         uploader_id: user.id,
         title: formData.title,
         description: formData.description || null,
-        duration: formData.duration || null,
+        duration_mins: formData.duration_mins || null,
         poster_url: formData.poster_url || null,
         mux_asset_id: formData.mux_asset_id || null,
         status: "processing",
@@ -64,7 +64,7 @@ export async function getUnfinishedDraft(): Promise<
     title: string;
     description: string | null;
     poster_url: string | null;
-    duration: number | null;
+    duration_mins: number | null;
   } | null>
 > {
   try {
@@ -78,9 +78,11 @@ export async function getUnfinishedDraft(): Promise<
     }
 
     // Find the latest unfinished draft
+    // Critical: Only return drafts where mux_asset_id IS NULL
+    // If mux_asset_id exists, Mux has the asset and it's processing, not a draft
     const { data, error } = await supabase
       .from("films")
-      .select("id, title, description, poster_url, duration")
+      .select("id, title, description, poster_url, duration_mins")
       .eq("uploader_id", user.id)
       .eq("status", "processing")
       .eq("submission_fee_paid", true)
@@ -106,7 +108,7 @@ export async function getUnfinishedDraft(): Promise<
 
 export async function updateFilm(
   filmId: string,
-  formData: { title: string; description?: string; duration?: number | null; poster_url?: string | null }
+  formData: { title: string; description?: string; duration_mins?: number | null; poster_url?: string | null }
 ): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
@@ -139,7 +141,7 @@ export async function updateFilm(
       .update({
         title: formData.title,
         description: formData.description || null,
-        duration: formData.duration || null,
+        duration_mins: formData.duration_mins || null,
         poster_url: formData.poster_url || null,
       })
       .eq("id", filmId);

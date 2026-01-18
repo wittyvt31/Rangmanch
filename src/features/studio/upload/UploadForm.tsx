@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ImageUpload } from "@/features/studio/components/ImageUpload";
 import { createFilm, updateFilm, updateFilmMuxData, addCredit, getUnfinishedDraft } from "@/features/studio/actions";
-import { getCredits, consumeCredit } from "@/features/payments/actions";
+import { getCoins, consumeCoin } from "@/features/payments/actions";
 import { PaymentModal } from "@/features/payments/components/PaymentModal";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 const filmSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   description: z.string().max(2000, "Description too long").optional(),
-  duration: z
+  duration_mins: z
     .union([z.number(), z.string(), z.undefined()])
     .optional()
     .transform((val) => {
@@ -46,7 +46,7 @@ const filmSchema = z.object({
 type FilmFormData = {
   title: string;
   description?: string;
-  duration?: string | number;
+  duration_mins?: string | number;
   poster_url?: string;
   credits?: { role: string; email: string }[];
 };
@@ -64,15 +64,15 @@ export function UploadForm() {
   const [uploadId, setUploadId] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [filmId, setFilmId] = useState<string | null>(null);
-  const [credits, setCredits] = useState<number | null>(null);
-  const [isCheckingCredits, setIsCheckingCredits] = useState(true);
+  const [coins, setCoins] = useState<number | null>(null);
+  const [isCheckingCoins, setIsCheckingCoins] = useState(true);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [foundDraft, setFoundDraft] = useState<{
     id: string;
     title: string;
     description: string | null;
     poster_url: string | null;
-    duration: number | null;
+    duration_mins: number | null;
   } | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [isResuming, setIsResuming] = useState(false);
@@ -99,10 +99,10 @@ export function UploadForm() {
 
   const posterUrl = watch("poster_url");
 
-  // Check credits and unfinished drafts on mount
+  // Check coins and unfinished drafts on mount
   useEffect(() => {
-    const checkCreditsAndDrafts = async () => {
-      setIsCheckingCredits(true);
+    const checkCoinsAndDrafts = async () => {
+      setIsCheckingCoins(true);
       
       // Check for unfinished drafts first
       const draftResult = await getUnfinishedDraft();
@@ -111,25 +111,25 @@ export function UploadForm() {
         setShowResumeDialog(true);
       }
       
-      // Check credits
-      const result = await getCredits();
+      // Check coins
+      const result = await getCoins();
       if (result.success) {
-        setCredits(result.data);
+        setCoins(result.data);
         if (result.data === 0) {
           setIsPaymentModalOpen(true);
         }
       } else {
         toast.error(result.error);
       }
-      setIsCheckingCredits(false);
+      setIsCheckingCoins(false);
     };
-    checkCreditsAndDrafts();
+    checkCoinsAndDrafts();
   }, []);
 
   const handlePaymentSuccess = async () => {
-    const result = await getCredits();
+    const result = await getCoins();
     if (result.success) {
-      setCredits(result.data);
+      setCoins(result.data);
       setIsPaymentModalOpen(false);
     }
   };
@@ -145,7 +145,7 @@ export function UploadForm() {
     // Populate form with draft data
     setValue("title", foundDraft.title);
     setValue("description", foundDraft.description || "");
-    setValue("duration", foundDraft.duration || undefined);
+    setValue("duration_mins", foundDraft.duration_mins || undefined);
     if (foundDraft.poster_url) {
       setValue("poster_url", foundDraft.poster_url);
     }
@@ -182,14 +182,14 @@ export function UploadForm() {
 
   // Step 1: Get Mux upload URL and create film record
   const handleStep1Submit = async (data: FilmFormData) => {
-    // If resuming, skip credit consumption and update existing film
+    // If resuming, skip coin consumption and update existing film
     if (isResuming && filmId) {
       try {
         // Update existing film with new data
         const updateResult = await updateFilm(filmId, {
           title: data.title,
           description: data.description || "",
-          duration: data.duration ? (typeof data.duration === "string" ? Number(data.duration) : data.duration) : null,
+          duration_mins: data.duration_mins ? (typeof data.duration_mins === "string" ? Number(data.duration_mins) : data.duration_mins) : null,
           poster_url: posterUrl || null,
         });
 
@@ -220,28 +220,28 @@ export function UploadForm() {
       return;
     }
 
-    // New upload flow - check and consume credit
-    if (credits === null || credits <= 0) {
+    // New upload flow - check and consume coin
+    if (coins === null || coins <= 0) {
       setIsPaymentModalOpen(true);
       return;
     }
 
-    // Consume 1 credit
-    const consumeResult = await consumeCredit();
+    // Consume 1 coin
+    const consumeResult = await consumeCoin();
     if (!consumeResult.success) {
-      toast.error(consumeResult.error || "Failed to consume credit");
+      toast.error(consumeResult.error || "Failed to consume coin");
       return;
     }
 
-    // Update local credits state
-    setCredits((prev) => (prev !== null ? prev - 1 : 0));
+    // Update local coins state
+    setCoins((prev) => (prev !== null ? prev - 1 : 0));
 
     try {
       // Create film record first (idempotent)
       const result = await createFilm({
         title: data.title,
         description: data.description || "",
-        duration: data.duration ? (typeof data.duration === "string" ? Number(data.duration) : data.duration) : null,
+        duration_mins: data.duration_mins ? (typeof data.duration_mins === "string" ? Number(data.duration_mins) : data.duration_mins) : null,
         poster_url: posterUrl || null,
         mux_asset_id: null,
       });
@@ -370,8 +370,8 @@ export function UploadForm() {
     }
   };
 
-  // Show payment modal if no credits
-  if (isCheckingCredits) {
+  // Show payment modal if no coins
+  if (isCheckingCoins) {
     return (
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="flex items-center justify-center py-12">
@@ -381,23 +381,27 @@ export function UploadForm() {
     );
   }
 
-  if (credits === 0) {
+  // Only show "No Coins Available" screen if:
+  // 1. No coins available AND
+  // 2. No active upload in progress (no filmId) AND
+  // 3. Not resuming a draft
+  if (coins === 0 && !filmId && !isResuming) {
     return (
       <div className="mx-auto max-w-4xl space-y-8">
         <div className="rounded-none border border-border bg-surface p-8 text-center">
           <Coins className="mx-auto h-12 w-12 text-accent mb-4" />
           <h2 className="font-serif text-2xl text-primary mb-2">
-            No Credits Available
+            No Coins Available
           </h2>
           <p className="text-primary/70 mb-6">
-            You need at least 1 credit to upload a film. Purchase a credit to
+            You need at least 1 coin to upload a film. Purchase a coin to
             get started.
           </p>
           <Button
             onClick={() => setIsPaymentModalOpen(true)}
             className="rounded-none"
           >
-            Buy Credit (₹199)
+            Buy Coin (₹199)
           </Button>
         </div>
         <PaymentModal
@@ -491,17 +495,17 @@ export function UploadForm() {
               </div>
 
               <div>
-                <Label htmlFor="duration">Duration (minutes)</Label>
+                <Label htmlFor="duration_mins">Duration (minutes)</Label>
                 <Input
-                  id="duration"
+                  id="duration_mins"
                   type="number"
-                  {...register("duration")}
+                  {...register("duration_mins")}
                   className="mt-2"
                   placeholder="e.g., 120"
                 />
-                {errors.duration && (
+                {errors.duration_mins && (
                   <p className="mt-1 text-sm text-destructive">
-                    {errors.duration.message}
+                    {errors.duration_mins.message}
                   </p>
                 )}
               </div>
@@ -710,7 +714,7 @@ export function UploadForm() {
               onClick={handleStartNew}
               className="w-full sm:w-auto"
             >
-              Start New (Consumes Credit)
+              Start New (Consumes Coin)
             </Button>
             <Button
               type="button"

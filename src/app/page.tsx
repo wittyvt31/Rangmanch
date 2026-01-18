@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { FilmCard } from "@/components/ui/film-card";
-import { ReservedSlot } from "@/components/ui/reserved-slot";
 import { Film } from "@/features/studio/types";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -14,13 +13,12 @@ interface FilmWithDirector extends Film {
 export default async function Home() {
   const supabase = await createClient();
 
-  // Fetch count of filmmakers (profiles with role 'filmmaker' or total count)
+  // Fetch count of all profiles (everyone is a member of the Republic)
   const { count: filmmakerCount } = await supabase
     .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "filmmaker");
+    .select("*", { count: "exact", head: true });
 
-  // Fetch live films (limit 30) with uploader profile for director name
+  // Fetch live films with uploader profile for director name
   const { data: films, error } = await supabase
     .from("films")
     .select(
@@ -33,8 +31,7 @@ export default async function Home() {
     `
     )
     .eq("status", "live")
-    .order("created_at", { ascending: false })
-    .limit(30);
+    .order("created_at", { ascending: false });
 
   if (error) {
     console.error("Error fetching films:", error);
@@ -80,10 +77,6 @@ export default async function Home() {
     } as FilmWithDirector;
   });
 
-  const totalSlots = 30;
-  const filmCount = filmsWithDirectors.length;
-  const reservedSlots = Math.max(0, totalSlots - filmCount);
-
   return (
     <main className="min-h-screen bg-background">
       {/* Hero Section */}
@@ -112,19 +105,23 @@ export default async function Home() {
 
       {/* The Grid */}
       <section className="container mx-auto px-4 py-12">
-        <h2 className="mb-8 font-serif text-3xl text-primary">The Republic</h2>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-          {filmsWithDirectors.map((film) => (
-            <FilmCard
-              key={film.id}
-              film={film}
-              directorName={film.director_name}
-            />
-          ))}
-          {Array.from({ length: reservedSlots }).map((_, index) => (
-            <ReservedSlot key={`reserved-${index}`} />
-          ))}
-        </div>
+        {filmsWithDirectors.length === 0 ? (
+          <div className="py-20 text-center">
+            <p className="font-serif text-2xl text-primary/60">
+              The stage is empty. Be the first to perform.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {filmsWithDirectors.map((film) => (
+              <FilmCard
+                key={film.id}
+                film={film}
+                directorName={film.director_name}
+              />
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );

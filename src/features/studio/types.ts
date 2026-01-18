@@ -3,7 +3,7 @@ export interface Film {
   uploader_id: string;
   title: string;
   description: string | null;
-  duration: number | null;
+  duration_mins: number | null;
   poster_url: string | null;
   mux_playback_id: string | null;
   mux_asset_id: string | null;
@@ -27,7 +27,7 @@ export interface Credit {
 export interface FilmFormData {
   title: string;
   description: string;
-  duration?: number | null;
+  duration_mins?: number | null;
   poster_url: string | null;
   mux_asset_id: string | null;
 }

@@ -1,10 +1,12 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { Film, Credit } from "@/features/studio/types";
 import { FilmCard } from "@/components/ui/film-card";
 import { CreditBadge } from "@/components/ui/credit-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Award } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { User, Award, LayoutDashboard } from "lucide-react";
 import Image from "next/image";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,11 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   const { username } = await params;
   const supabase = await createClient();
 
+  // Get current user (if logged in)
+  const {
+    data: { user: currentUser },
+  } = await supabase.auth.getUser();
+
   // Fetch profile by username
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
@@ -42,6 +49,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
   }
 
   const userProfile = profile as Profile;
+  const isOwner = currentUser?.id === userProfile.id;
 
   // Fetch films uploaded by this user
   const { data: uploadedFilms } = await supabase
@@ -133,19 +141,31 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
               )}
             </div>
             <div className="flex-1">
-              <h1 className="font-serif text-3xl text-primary">
-                {userProfile.username || userProfile.email}
-              </h1>
-              {userProfile.bio && (
-                <p className="mt-2 text-primary/80">{userProfile.bio}</p>
-              )}
-              <div className="mt-4 flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Award className="h-4 w-4 text-accent" />
-                  <span className="text-sm text-primary/70">
-                    Reputation: {userProfile.reputation_score || 0}
-                  </span>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <h1 className="font-serif text-3xl text-primary">
+                    {userProfile.username || userProfile.email}
+                  </h1>
+                  {userProfile.bio && (
+                    <p className="mt-2 text-primary/80">{userProfile.bio}</p>
+                  )}
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-4 w-4 text-accent" />
+                      <span className="text-sm text-primary/70">
+                        Reputation: {userProfile.reputation_score || 0}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+                {isOwner && (
+                  <Link href="/studio">
+                    <Button variant="outline" className="flex items-center gap-2">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Studio
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </div>

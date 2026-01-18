@@ -3,29 +3,29 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { PaymentModal } from "./PaymentModal";
-import { getCredits } from "../actions";
+import { getCoins } from "../actions";
 import { Coins } from "lucide-react";
 
-export function CreditsDisplay() {
-  const [credits, setCredits] = useState<number | null>(null);
+export function CoinsDisplay() {
+  const [coins, setCoins] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    loadCredits();
+    loadCoins();
   }, []);
 
-  const loadCredits = async () => {
+  const loadCoins = async () => {
     setIsLoading(true);
-    const result = await getCredits();
+    const result = await getCoins();
     if (result.success) {
-      setCredits(result.data);
+      setCoins(result.data);
     }
     setIsLoading(false);
   };
 
   const handlePaymentSuccess = () => {
-    loadCredits();
+    loadCoins();
   };
 
   return (
@@ -35,9 +35,9 @@ export function CreditsDisplay() {
           <div className="flex items-center gap-2">
             <Coins className="h-5 w-5 text-accent" />
             <div>
-              <p className="text-sm text-primary/70">Credits Available</p>
+              <p className="text-sm text-primary/70">Coins Available</p>
               <p className="font-serif text-2xl text-primary">
-                {isLoading ? "..." : credits ?? 0}
+                {isLoading ? "..." : coins ?? 0}
               </p>
             </div>
           </div>
@@ -46,7 +46,7 @@ export function CreditsDisplay() {
             className="rounded-none"
             variant="outline"
           >
-            Buy Credit
+            Buy Coin
           </Button>
         </div>
       </div>
@@ -58,5 +58,8 @@ export function CreditsDisplay() {
     </>
   );
 }
+
+
+
 
 

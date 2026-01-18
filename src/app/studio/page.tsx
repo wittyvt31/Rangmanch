@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { FilmsTable } from "@/features/studio/components/FilmsTable";
 import { Film } from "@/features/studio/types";
-import { CreditsDisplay } from "@/features/payments/components/CreditsDisplay";
+import { CoinsDisplay } from "@/features/payments/components/CoinsDisplay";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +36,7 @@ export default async function StudioDashboardPage() {
         </p>
       </div>
 
-      <CreditsDisplay />
+      <CoinsDisplay />
 
       <FilmsTable films={(films as Film[]) || []} />
     </div>

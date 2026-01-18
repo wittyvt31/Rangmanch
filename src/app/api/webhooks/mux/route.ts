@@ -102,7 +102,7 @@ export async function POST(request: NextRequest) {
             status: "live",
             mux_playback_id: playbackId,
             mux_asset_id: id,
-            duration: durationMins,
+            duration_mins: durationMins,
           })
           .eq("id", filmId);
 

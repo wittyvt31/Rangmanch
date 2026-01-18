@@ -39,7 +39,7 @@ export async function createOrder(): Promise<ActionResult<{ orderId: string }>> 
     const options = {
       amount: 19900, // ₹199 in paise
       currency: "INR",
-      receipt: `rcpt_${user.id.slice(-12)}_${Date.now().toString().slice(-8)}`,
+      receipt: `coin_${user.id.slice(-12)}_${Date.now().toString().slice(-8)}`,
     };
 
     const order = await razorpay.orders.create(options);
@@ -87,8 +87,10 @@ export async function verifyPayment(
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Check if this order was already processed (idempotency)
-    // We check if a transaction with this razorpay_order_id already exists
+    // Idempotency check: Prevent duplicate coins on network retries
+    // Query for existing transaction by razorpay_order_id to ensure
+    // even if verifyPayment is called multiple times for the same order,
+    // the user only gets 1 coin
     const { data: existingTransaction } = await supabaseAdmin
       .from("transactions")
       .select("id")
@@ -97,11 +99,12 @@ export async function verifyPayment(
       .single();
 
     if (existingTransaction) {
-      // Already processed, return success without double-crediting
+      // Already processed, return success without double-adding coins
+      // This handles network crashes where client retries after payment
       return { success: true, data: undefined };
     }
 
-    // Store transaction record for idempotency (before crediting)
+    // Store transaction record for idempotency (before adding coin)
     const { error: transactionError } = await supabaseAdmin
       .from("transactions")
       .insert({
@@ -109,19 +112,19 @@ export async function verifyPayment(
         amount: 199,
         razorpay_order_id: razorpay_order_id,
         status: "success",
-        type: "credit_purchase",
+        type: "coin_purchase",
       });
 
     if (transactionError) {
       console.error("Error storing transaction:", transactionError);
-      // Continue anyway, we'll still update the credit
+      // Continue anyway, we'll still update the coin
     }
 
-    // Increment submission_credits by 1
+    // Increment coins by 1
     console.log("Searching for profile with ID:", user.id);
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("profiles")
-      .select("submission_credits")
+      .select("coins")
       .eq("id", user.id)
       .single();
 
@@ -130,18 +133,18 @@ export async function verifyPayment(
       return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
-    const currentCredits = profile.submission_credits || 0;
+    const currentCoins = profile.coins || 0;
 
-    const { error: creditError } = await supabaseAdmin
+    const { error: coinError } = await supabaseAdmin
       .from("profiles")
       .update({
-        submission_credits: currentCredits + 1,
+        coins: currentCoins + 1,
       })
       .eq("id", user.id);
 
-    if (creditError) {
-      console.error("Error updating credits:", creditError);
-      return { success: false, error: "Failed to update credits" };
+    if (coinError) {
+      console.error("Error updating coins:", coinError);
+      return { success: false, error: "Failed to update coins" };
     }
 
     revalidatePath("/studio");
@@ -155,7 +158,7 @@ export async function verifyPayment(
   }
 }
 
-export async function consumeCredit(): Promise<ActionResult<void>> {
+export async function consumeCoin(): Promise<ActionResult<void>> {
   try {
     const supabase = await createClient();
     const {
@@ -166,11 +169,11 @@ export async function consumeCredit(): Promise<ActionResult<void>> {
       return { success: false, error: "Unauthorized" };
     }
 
-    // Check current credits
+    // Check current coins
     console.log("Searching for profile with ID:", user.id);
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
-      .select("submission_credits")
+      .select("coins")
       .eq("id", user.id)
       .single();
 
@@ -179,29 +182,29 @@ export async function consumeCredit(): Promise<ActionResult<void>> {
       return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
-    const currentCredits = profile.submission_credits || 0;
+    const currentCoins = profile.coins || 0;
 
-    if (currentCredits <= 0) {
-      return { success: false, error: "Insufficient credits" };
+    if (currentCoins <= 0) {
+      return { success: false, error: "Insufficient coins" };
     }
 
-    // Deduct 1 credit
-    const { error: creditError } = await supabase
+    // Deduct 1 coin
+    const { error: coinError } = await supabase
       .from("profiles")
       .update({
-        submission_credits: currentCredits - 1,
+        coins: currentCoins - 1,
       })
       .eq("id", user.id);
 
-    if (creditError) {
-      console.error("Error consuming credit:", creditError);
-      return { success: false, error: "Failed to consume credit" };
+    if (coinError) {
+      console.error("Error consuming coin:", coinError);
+      return { success: false, error: "Failed to consume coin" };
     }
 
     revalidatePath("/studio");
     return { success: true, data: undefined };
   } catch (error) {
-    console.error("Error consuming credit:", error);
+    console.error("Error consuming coin:", error);
     return {
       success: false,
       error: "An unexpected error occurred",
@@ -209,7 +212,7 @@ export async function consumeCredit(): Promise<ActionResult<void>> {
   }
 }
 
-export async function getCredits(): Promise<ActionResult<number>> {
+export async function getCoins(): Promise<ActionResult<number>> {
   try {
     const supabase = await createClient();
     const {
@@ -223,7 +226,7 @@ export async function getCredits(): Promise<ActionResult<number>> {
     console.log("Searching for profile with ID:", user.id);
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("submission_credits")
+      .select("coins")
       .eq("id", user.id)
       .single();
 
@@ -232,9 +235,9 @@ export async function getCredits(): Promise<ActionResult<number>> {
       return { success: false, error: `Profile not found for ID: ${user.id}` };
     }
 
-    return { success: true, data: profile.submission_credits || 0 };
+    return { success: true, data: profile.coins || 0 };
   } catch (error) {
-    console.error("Error getting credits:", error);
+    console.error("Error getting coins:", error);
     return {
       success: false,
       error: "An unexpected error occurred",
